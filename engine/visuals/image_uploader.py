@@ -28,7 +28,7 @@ class ImageHost(ABC):
     name: str = "abstract"
 
     @abstractmethod
-    async def upload(self, path: Path) -> str:
+    async def upload(self, path: str | Path) -> str:
         ...
 
 
@@ -39,8 +39,9 @@ class ImgBBHost(ImageHost):
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
 
-    async def upload(self, path: Path) -> str:
-        encoded = base64.b64encode(path.read_bytes()).decode()
+    async def upload(self, path: str | Path) -> str:
+        p = Path(path)
+        encoded = base64.b64encode(p.read_bytes()).decode()
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(3),
             wait=wait_exponential(multiplier=0.5, min=1, max=8),
@@ -67,8 +68,8 @@ class LocalHost(ImageHost):
 
     name = "local"
 
-    async def upload(self, path: Path) -> str:
-        url = path.resolve().as_uri()
+    async def upload(self, path: str | Path) -> str:
+        url = Path(path).resolve().as_uri()
         log.info("image_local", url=url)
         return url
 
