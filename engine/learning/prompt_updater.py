@@ -15,7 +15,7 @@ from sqlalchemy import desc, select
 
 from engine.db import session_scope
 from engine.logging_setup import get_logger
-from engine.models import EngagementSnapshot, Post
+from engine.models import EngagementSnapshot, GrowthScoreSnapshot, Post
 
 log = get_logger(__name__)
 
@@ -37,6 +37,14 @@ async def collect_top_posts(days: int = 14, top_n: int = 20) -> list[Post]:
         )).scalars().all()
         scored: list[tuple[float, Post]] = []
         for p in posts:
+            # Prefer the composite growth_score; fall back to engagement_score
+            # if the post hasn't been scored yet (cold-start safe).
+            gs = (await s.execute(
+                select(GrowthScoreSnapshot).where(GrowthScoreSnapshot.post_id == p.id)
+            )).scalars().first()
+            if gs is not None and gs.growth_score > 0:
+                scored.append((gs.growth_score, p))
+                continue
             snap = (await s.execute(
                 select(EngagementSnapshot)
                 .where(EngagementSnapshot.post_id == p.id)

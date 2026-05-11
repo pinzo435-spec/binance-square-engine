@@ -19,6 +19,7 @@ from engine.db import session_scope
 from engine.distribution.api_publisher import ApiPublisher, PublishResult
 from engine.distribution.browser_publisher import BrowserPublisher
 from engine.distribution.rate_limiter import RateLimiter
+from engine.growth import safety_layer
 from engine.logging_setup import get_logger
 from engine.models import Opportunity, Post
 from engine.visuals.image_uploader import build_image_host
@@ -45,6 +46,26 @@ class Publisher:
             log.warning("publish_rate_blocked", ticker=post.ticker, reason=decision.reason)
             await self._record_post(post, opportunity_id, "blocked", decision.reason)
             return PublishResult(False, None, {}, f"rate_blocked: {decision.reason}")
+
+        # Growth safety layer — quality guards (duplicates, repetition, cooldown).
+        opp_score = 0.0
+        if opportunity_id is not None:
+            async with session_scope() as s:
+                opp = await s.get(Opportunity, opportunity_id)
+                if opp is not None:
+                    opp_score = float(opp.priority_score or 0.0)
+        verdict = await safety_layer.check(
+            body_text=post.body_text,
+            ticker=post.ticker,
+            opportunity_score=opp_score,
+        )
+        if not verdict.allow:
+            log.warning(
+                "publish_safety_blocked", ticker=post.ticker,
+                reason=verdict.reason, detail=verdict.detail,
+            )
+            await self._record_post(post, opportunity_id, "blocked", f"safety:{verdict.reason}")
+            return PublishResult(False, None, {}, f"safety_blocked: {verdict.reason}")
 
         # 1. Upload images → URLs
         image_urls: list[str] = []
