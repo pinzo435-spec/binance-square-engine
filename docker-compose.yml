@@ -1,0 +1,39 @@
+services:
+  engine:
+    build: .
+    image: binance-square-engine:latest
+    container_name: bse-engine
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./prompts:/app/prompts
+      - ./playbooks:/app/playbooks
+    command: ["python", "auto_publish.py"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    networks: [bse]
+
+  dashboard:
+    build: .
+    image: binance-square-engine:latest
+    container_name: bse-dashboard
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./prompts:/app/prompts
+      - ./playbooks:/app/playbooks
+    command: ["python", "-m", "engine.dashboard"]
+    ports:
+      - "8000:8000"
+    depends_on: [engine]
+    networks: [bse]
+
+networks:
+  bse: {}

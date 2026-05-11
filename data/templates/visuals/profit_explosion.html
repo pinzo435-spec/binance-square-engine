@@ -1,0 +1,80 @@
+<!doctype html>
+<html dir="ltr" lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing:border-box; }
+  html, body {
+    margin:0; padding:0;
+    width:1440px; height:3088px;
+    background:#0b0e11; color:#eaecef;
+    font-family:'Inter','SF Pro Display','Segoe UI',Arial, sans-serif;
+  }
+  .wrap {
+    padding:120px 100px; height:100%;
+    background:
+      radial-gradient(2000px 1500px at 50% 25%, rgba(14,203,129,0.22), transparent 60%),
+      radial-gradient(1200px 1000px at 100% 100%, rgba(240,185,11,0.18), transparent 55%),
+      #0b0e11;
+    display:flex; flex-direction:column;
+  }
+  .brand { color:#F0B90B; font-size:48px; font-weight:800; letter-spacing:1px; }
+  .badge {
+    margin-top:80px;
+    display:inline-flex; align-items:center; gap:18px;
+    background:rgba(14,203,129,0.16); color:#0ECB81;
+    padding:24px 40px; border-radius:999px;
+    font-size:48px; font-weight:700; align-self:flex-start;
+  }
+
+  .symbol { margin-top:80px; font-size:200px; font-weight:800; letter-spacing:-3px; }
+  .quote { color:#848e9c; font-size:64px; margin-top:8px; }
+
+  .mega {
+    margin-top:140px;
+    font-size:420px; font-weight:900; color:#0ECB81; letter-spacing:-8px;
+    line-height:0.9;
+  }
+  .mega-suffix { font-size:120px; color:#0ECB81; font-weight:800; }
+  .label { color:#848e9c; font-size:64px; margin-top:30px; }
+
+  .stack {
+    margin-top:160px;
+    display:flex; flex-direction:column; gap:40px;
+  }
+  .stack .row {
+    display:flex; justify-content:space-between; align-items:baseline;
+    border-bottom:1px solid rgba(132,142,156,0.18); padding:30px 10px;
+  }
+  .row .k { color:#848e9c; font-size:54px; }
+  .row .v { font-size:80px; font-weight:700; }
+
+  .footer { margin-top:auto; display:flex; justify-content:space-between;
+            color:#5a6470; font-size:40px; padding-top:60px; }
+  .handle { color:#F0B90B; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">BINANCE • Profit</div>
+  <div class="badge">🔥 LIVE WIN</div>
+  <div class="symbol">{{SYMBOL}}</div>
+  <div class="quote">{{SYMBOL}}/USDT</div>
+
+  <div class="mega">{{PCT_SIGN}}{{PCT_VALUE}}<span class="mega-suffix">%</span></div>
+  <div class="label">ROI خلال {{DURATION}}</div>
+
+  <div class="stack">
+    <div class="row"><div class="k">من</div><div class="v">${{FROM_USD}}</div></div>
+    <div class="row"><div class="k">إلى</div><div class="v">${{TO_USD}}</div></div>
+    <div class="row"><div class="k">سعر الدخول</div><div class="v">${{ENTRY_PRICE}}</div></div>
+    <div class="row"><div class="k">سعر التصفية</div><div class="v">${{CLOSE_PRICE}}</div></div>
+  </div>
+
+  <div class="footer">
+    <div class="handle">@{{HANDLE}}</div>
+    <div>{{TIMESTAMP}}</div>
+  </div>
+</div>
+</body>
+</html>

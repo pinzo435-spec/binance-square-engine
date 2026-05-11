@@ -1,0 +1,36 @@
+# Burst-trigger rules. When met, the engine inserts extra posts outside the
+# normal schedule (subject to rate limits in rate_limiter.py).
+
+triggers:
+  - name: extreme_pump
+    when:
+      change_1h_pct: ">= 15"
+      volume_ratio:  ">= 5"
+    burst:
+      post_count: 2
+      gap_seconds: 120
+      templates: [profit_explosion, trade_card]
+
+  - name: extreme_dump
+    when:
+      change_1h_pct: "<= -10"
+    burst:
+      post_count: 2
+      gap_seconds: 180
+      templates: [warning_card, chart_card]
+
+  - name: news_listing
+    when:
+      news_trigger_in: [BINANCE_LIST, PARTNERSHIP]
+    burst:
+      post_count: 2
+      gap_seconds: 240
+      templates: [trade_card, chart_card]
+
+  - name: trending_hashtag
+    when:
+      binance_trend_match: true
+    burst:
+      post_count: 1
+      gap_seconds: 0
+      templates: [chart_card, big_picture]

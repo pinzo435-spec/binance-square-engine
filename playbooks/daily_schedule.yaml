@@ -1,0 +1,40 @@
+# Daily posting schedule (UTC).
+# Each slot describes when to publish and what kind of post is preferred.
+# The scheduler will pick the top-priority opportunity that matches the slot's
+# `templates` whitelist (or the highest-priority opportunity overall as fallback).
+
+timezone: UTC
+
+slots:
+  # Morning Asia
+  - { time: "06:30", group: morning_asia, jitter_minutes: 7 }
+  - { time: "07:30", group: morning_asia, jitter_minutes: 7 }
+  - { time: "08:45", group: morning_asia, jitter_minutes: 7 }
+  - { time: "09:15", group: morning_asia, jitter_minutes: 5 }
+  # Pre-EU
+  - { time: "11:30", group: pre_eu, jitter_minutes: 7 }
+  - { time: "12:15", group: pre_eu, jitter_minutes: 5 }
+  - { time: "13:00", group: pre_eu, jitter_minutes: 5 }
+  # Power Hour (US open)
+  - { time: "15:30", group: power_hour, jitter_minutes: 4 }
+  - { time: "16:15", group: power_hour, jitter_minutes: 4 }
+  - { time: "17:00", group: power_hour, jitter_minutes: 4 }
+  - { time: "17:45", group: power_hour, jitter_minutes: 4 }
+  - { time: "18:30", group: power_hour, jitter_minutes: 4 }
+  # Prime time GCC
+  - { time: "20:00", group: prime_gcc, jitter_minutes: 6 }
+  - { time: "20:30", group: prime_gcc, jitter_minutes: 5 }
+  - { time: "21:00", group: prime_gcc, jitter_minutes: 5 }   # Red Envelope candidate
+  - { time: "21:30", group: prime_gcc, jitter_minutes: 5 }
+  - { time: "22:00", group: prime_gcc, jitter_minutes: 5 }
+  - { time: "22:45", group: prime_gcc, jitter_minutes: 6 }
+  # Late night (optional, can be disabled)
+  - { time: "00:30", group: late_night, jitter_minutes: 10 }
+  - { time: "01:30", group: late_night, jitter_minutes: 10 }
+
+slot_templates:
+  morning_asia:   [trade_card, chart_card, big_picture]
+  pre_eu:         [trade_card, warning_card, chart_card]
+  power_hour:     [trade_card, chart_card, profit_explosion, warning_card]
+  prime_gcc:      [trade_card, profit_explosion, warning_card, chart_card]
+  late_night:     [trade_card, chart_card]

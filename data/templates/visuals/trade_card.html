@@ -1,0 +1,143 @@
+<!doctype html>
+<html dir="ltr" lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face {
+    font-family: 'BinanceSans';
+    src: local('Inter'), local('SF Pro Display'), local('Segoe UI');
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 1440px; height: 3088px;
+    background: #0b0e11;
+    color: #eaecef;
+    font-family: 'BinanceSans', 'Inter', 'SF Pro Display', 'Segoe UI', Arial, sans-serif;
+    overflow: hidden;
+  }
+  .container {
+    width: 100%; height: 100%;
+    padding: 110px 100px;
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(1500px 800px at -10% -10%, rgba(240, 185, 11, 0.10), transparent 60%),
+      radial-gradient(1400px 800px at 110% 110%, rgba(14, 203, 129, 0.08), transparent 55%),
+      #0b0e11;
+  }
+  .top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 44px; color: #848e9c;
+  }
+  .top-bar .brand {
+    color: #F0B90B; font-weight: 800; letter-spacing: 1px;
+  }
+  .pair {
+    margin-top: 60px;
+    display: flex; align-items: center; gap: 32px;
+  }
+  .pair .symbol {
+    font-size: 120px; font-weight: 800; letter-spacing: -1px;
+  }
+  .pair .tag {
+    background: rgba(240, 185, 11, 0.16);
+    color: #F0B90B;
+    padding: 16px 28px; border-radius: 16px;
+    font-size: 36px; font-weight: 700;
+  }
+  .quote-meta { color: #848e9c; font-size: 42px; margin-top: 16px; }
+
+  .pnl-block {
+    margin-top: 130px;
+  }
+  .pnl-label { color: #848e9c; font-size: 56px; font-weight: 500; }
+  .pnl-value {
+    font-size: 280px; font-weight: 800; letter-spacing: -4px;
+    margin-top: 16px;
+  }
+  .pct-row {
+    display: flex; align-items: baseline; gap: 28px; margin-top: 60px;
+  }
+  .pct-value { font-size: 200px; font-weight: 800; letter-spacing: -3px; }
+  .pct-suffix { font-size: 80px; font-weight: 600; color: #848e9c; }
+
+  .pos { color: #0ECB81; }
+  .neg { color: #F6465D; }
+
+  .grid {
+    margin-top: 180px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 50px;
+  }
+  .cell {
+    background: rgba(30, 35, 41, 0.7);
+    border: 1px solid rgba(132, 142, 156, 0.18);
+    border-radius: 24px;
+    padding: 50px 56px;
+  }
+  .cell .k { color: #848e9c; font-size: 44px; }
+  .cell .v { font-size: 80px; font-weight: 700; margin-top: 16px; }
+
+  .footer {
+    margin-top: auto;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    color: #5a6470; font-size: 40px;
+  }
+  .footer .handle { color: #F0B90B; font-weight: 700; }
+  .badge {
+    display: inline-block; margin-left: 16px;
+    background: rgba(14, 203, 129, 0.12); color: #0ECB81;
+    padding: 8px 18px; border-radius: 999px; font-size: 28px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <div class="brand">BINANCE</div>
+    <div>الأرباح والخسائر • Futures</div>
+  </div>
+
+  <div class="pair">
+    <div class="symbol">{{SYMBOL}}</div>
+    <div class="tag">{{LEVERAGE}}</div>
+  </div>
+  <div class="quote-meta">{{QUOTE_META}}</div>
+
+  <div class="pnl-block">
+    <div class="pnl-label">PnL (USDT)</div>
+    <div class="pnl-value {{COLOR_CLASS}}">{{PNL_SIGN}}{{PNL_USD}}</div>
+    <div class="pct-row">
+      <div class="pct-value {{COLOR_CLASS}}">{{PCT_SIGN}}{{PCT_VALUE}}%</div>
+      <div class="pct-suffix">ROI</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="cell">
+      <div class="k">سعر الدخول</div>
+      <div class="v">{{ENTRY_PRICE}}</div>
+    </div>
+    <div class="cell">
+      <div class="k">سعر التصفية</div>
+      <div class="v">{{CLOSE_PRICE}}</div>
+    </div>
+    <div class="cell">
+      <div class="k">حجم الصفقة</div>
+      <div class="v">{{SIZE}}</div>
+    </div>
+    <div class="cell">
+      <div class="k">المدة</div>
+      <div class="v">{{DURATION}}</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <span class="handle">@{{HANDLE}}</span>
+      <span class="badge">Trader</span>
+    </div>
+    <div>{{TIMESTAMP}}</div>
+  </div>
+</div>
+</body>
+</html>
