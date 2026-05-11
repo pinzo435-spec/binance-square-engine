@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import desc, select
 
@@ -14,7 +14,7 @@ log = get_logger(__name__)
 
 
 async def update_template_stats(window_days: int = 14) -> int:
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=window_days)
+    cutoff = datetime.now(tz=UTC) - timedelta(days=window_days)
     async with session_scope() as s:
         posts = (await s.execute(
             select(Post).where(
@@ -56,7 +56,7 @@ async def update_template_stats(window_days: int = 14) -> int:
             row.avg_views = avg_views
             row.avg_likes = avg_likes
             row.avg_engagement = avg_eng
-            row.last_used_at = datetime.now(tz=timezone.utc)
+            row.last_used_at = datetime.now(tz=UTC)
             updated += 1
         log.info("templates_updated", count=updated)
         return updated

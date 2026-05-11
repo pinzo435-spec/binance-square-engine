@@ -6,9 +6,11 @@ account publishes about a ticker so we can react quickly with our own angle.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -19,6 +21,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from engine.config import get_settings
 from engine.logging_setup import get_logger
 
 log = get_logger(__name__)
@@ -67,43 +70,123 @@ class ReferenceFeed:
         self.square_uid = square_uid
         self._client = client
         self._owns_client = client is None
+        self._winning_payload: dict | None = None
 
-    async def __aenter__(self) -> "ReferenceFeed":
+    async def __aenter__(self) -> ReferenceFeed:
         if self._client is None:
+            cookies = self._load_cookies_for_httpx()
+            headers = dict(DEFAULT_HEADERS)
+            # Some Binance endpoints require csrftoken + bnc-uuid headers when
+            # the request is authenticated. Both are exposed as cookies after
+            # login, so we mirror them into request headers.
+            if cookies:
+                if (csrf := cookies.get("csrftoken")):
+                    headers["csrftoken"] = csrf
+                if (uuid := cookies.get("bnc-uuid")):
+                    headers["bnc-uuid"] = uuid
+                headers.setdefault("Referer", "https://www.binance.com/en/square")
             self._client = httpx.AsyncClient(
                 timeout=30.0,
                 http2=True,
-                headers=DEFAULT_HEADERS,
+                headers=headers,
+                cookies=cookies or None,
             )
             self._owns_client = True
         return self
+
+    @staticmethod
+    def _load_cookies_for_httpx() -> dict[str, str]:
+        """Pull cookies from the saved binance_cookies.json (Playwright shape)."""
+        try:
+            path = get_settings().binance_cookies_path
+        except Exception:  # noqa: BLE001
+            return {}
+        if not Path(path).exists():
+            return {}
+        try:
+            raw = json.loads(Path(path).read_text())
+        except Exception:  # noqa: BLE001
+            return {}
+        out: dict[str, str] = {}
+        for c in raw:
+            name = c.get("name")
+            value = c.get("value")
+            if name and value:
+                out[name] = value
+        return out
 
     async def __aexit__(self, *args: Any) -> None:
         if self._owns_client and self._client is not None:
             await self._client.aclose()
 
+    # Payload variants we'll try, in order. Binance has rotated this schema
+    # multiple times; the first one to return code "000000" wins.
+    _PAYLOAD_VARIANTS: list[dict] = [
+        {"squareUid": "{uid}", "timeOffset": "{off}", "filterType": "ALL", "size": 20},
+        {"targetSquareUid": "{uid}", "timeOffset": "{off}", "filterType": "ALL", "size": 20},
+        {"squareUserId": "{uid}", "timeOffset": "{off}", "filterType": "ALL", "size": 20},
+        {"targetUid": "{uid}", "timeOffset": "{off}", "size": 20},
+        {"squareUid": "{uid}", "timeOffset": "{off}", "size": 20},
+        {"squareUid": "{uid}", "filterType": "ALL", "size": 20},
+    ]
+
     async def fetch_page(self, time_offset: int = -1) -> dict:
-        """Fetch one page. `time_offset` paginates backwards via the API."""
+        """Fetch one page. `time_offset` paginates backwards via the API.
+
+        Tries each payload variant in `_PAYLOAD_VARIANTS` until one returns
+        code "000000". Caches the winning variant for subsequent calls.
+        """
         assert self._client is not None
 
-        # Endpoint accepts both GET and POST forms; POST is what the web app uses.
-        payload = {
-            "targetSquareUid": self.square_uid,
-            "timeOffset": time_offset,
-            "filterType": "ALL",
-            "size": 20,
-        }
-        async for attempt in AsyncRetrying(
-            stop=stop_after_attempt(3),
-            wait=wait_exponential(multiplier=0.6, min=0.5, max=4.0),
-            retry=retry_if_exception_type((httpx.HTTPError,)),
-            reraise=True,
-        ):
-            with attempt:
-                r = await self._client.post(URL, json=payload)
-                r.raise_for_status()
-                return r.json()
-        return {}  # pragma: no cover
+        def _hydrate(template: dict) -> dict:
+            return {
+                k: (
+                    self.square_uid if v == "{uid}"
+                    else time_offset if v == "{off}"
+                    else v
+                )
+                for k, v in template.items()
+            }
+
+        variants = (
+            [self._winning_payload] if self._winning_payload is not None
+            else list(self._PAYLOAD_VARIANTS)
+        )
+
+        last_body: dict = {}
+        for variant in variants:
+            payload = _hydrate(variant)
+            try:
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential(multiplier=0.6, min=0.5, max=4.0),
+                    retry=retry_if_exception_type((httpx.HTTPError,)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await self._client.post(URL, json=payload)
+                        r.raise_for_status()
+                        body = r.json()
+                        last_body = body
+            except Exception as e:  # noqa: BLE001
+                log.debug("reference_feed_variant_http_failed", error=str(e))
+                continue
+            code = str(body.get("code") or "000000")
+            if code == "000000":
+                if self._winning_payload is None:
+                    self._winning_payload = variant
+                    log.info(
+                        "reference_feed_variant_locked", keys=list(variant.keys())
+                    )
+                return body
+            log.debug(
+                "reference_feed_business_error",
+                code=code,
+                keys=list(variant.keys()),
+                message=body.get("message"),
+            )
+        log.warning("reference_feed_all_variants_failed", last=last_body.get("message"))
+        return last_body
 
     async def fetch_latest(self, max_posts: int = 40) -> list[ReferencePostRecord]:
         """Fetch the most recent `max_posts` from the reference profile."""
@@ -149,7 +232,7 @@ class ReferenceFeed:
                 ts = int(pub_ts)
                 if ts > 1e12:
                     ts /= 1000
-                published_at = datetime.fromtimestamp(ts, tz=timezone.utc)
+                published_at = datetime.fromtimestamp(ts, tz=UTC)
             except Exception:
                 published_at = None
 

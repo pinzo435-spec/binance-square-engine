@@ -15,7 +15,7 @@ import random
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -146,7 +146,7 @@ class CardRenderer:
         self._settings = get_settings()
         self._lock = asyncio.Lock()
 
-    async def __aenter__(self) -> "CardRenderer":
+    async def __aenter__(self) -> CardRenderer:
         from playwright.async_api import async_playwright
 
         self._playwright = await async_playwright().start()
@@ -212,7 +212,7 @@ def build_trade_card_subs(
         "SIZE": f"${fmt_compact(size_usdt)}" if size_usdt else "—",
         "DURATION": duration,
         "HANDLE": handle,
-        "TIMESTAMP": datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "TIMESTAMP": datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC"),
     }
 
 
@@ -245,7 +245,7 @@ def build_chart_card_subs(
         "LOW_24H": fmt_money(low_24h, max_decimals=4),
         "VOL_24H": fmt_compact(volume_24h_usd),
         "HANDLE": handle,
-        "TIMESTAMP": datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "TIMESTAMP": datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC"),
     }
 
 
@@ -273,7 +273,7 @@ def build_warning_card_subs(
         "LOW_24H": fmt_money(low_24h, max_decimals=4),
         "VOL_24H": fmt_compact(volume_24h_usd),
         "HANDLE": handle,
-        "TIMESTAMP": datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "TIMESTAMP": datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC"),
     }
 
 
@@ -299,7 +299,7 @@ def build_profit_explosion_subs(
         "CLOSE_PRICE": fmt_money(close_price, max_decimals=4),
         "DURATION": duration,
         "HANDLE": handle,
-        "TIMESTAMP": datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "TIMESTAMP": datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC"),
     }
 
 

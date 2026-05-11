@@ -16,8 +16,9 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import typer
@@ -30,7 +31,6 @@ from engine.analytics.post_tracker import PostTracker
 from engine.analytics.reports import build_report, report_to_markdown
 from engine.config import get_settings
 from engine.content.hook_generator import HookGenerator, HookRequest
-from engine.content.post_assembler import PostAssembler
 from engine.db import init_db, session_scope
 from engine.distribution.publisher import Publisher
 from engine.distribution.scheduler import EngineScheduler
@@ -239,7 +239,7 @@ def cmd_pause(
         await init_db()
         async with session_scope() as s:
             s.add(PublishLock(
-                paused_until=datetime.now(tz=timezone.utc) + timedelta(hours=hours),
+                paused_until=datetime.now(tz=UTC) + timedelta(hours=hours),
                 reason=reason,
             ))
         rprint(f"[yellow]paused[/yellow] for {hours}h — reason: {reason}")
@@ -285,9 +285,164 @@ def cmd_cookies_import(path: Path) -> None:
     """Import cookies exported as JSON (array of cookie objects)."""
     settings = get_settings()
     raw = json.loads(Path(path).read_text())
+    # Light validation — must be list of dicts with name+value+domain.
+    if not isinstance(raw, list) or not all(isinstance(c, dict) and {"name", "value"}.issubset(c) for c in raw):
+        rprint("[red]✗[/red] file must be a JSON array of cookie objects (name/value/domain/…)")
+        raise typer.Exit(code=1)
     settings.binance_cookies_path.parent.mkdir(parents=True, exist_ok=True)
     settings.binance_cookies_path.write_text(json.dumps(raw, indent=2))
+    with contextlib.suppress(Exception):
+        settings.binance_cookies_path.chmod(0o600)
     rprint(f"[green]✓[/green] wrote {len(raw)} cookies → {settings.binance_cookies_path}")
+
+
+@app.command("cookies-export")
+def cmd_cookies_export(
+    url: str = typer.Option("https://www.binance.com/en/square", help="Page to start at"),
+    minutes: int = typer.Option(5, help="How long to wait for login"),
+) -> None:
+    """Open Chromium so you can log in to Binance manually; save the cookies on exit."""
+    async def _go() -> None:
+        from playwright.async_api import async_playwright
+
+        settings = get_settings()
+        rprint("[cyan]→[/cyan] opening Chromium. Log in to Binance, then close the browser when done.")
+        rprint(f"   You have up to {minutes} min. Cookies will be saved to {settings.binance_cookies_path}")
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=False, args=["--no-sandbox"])
+            context = await browser.new_context(
+                viewport={"width": 1366, "height": 900},
+                locale="ar-SA",
+            )
+            page = await context.new_page()
+            await page.goto(url, wait_until="domcontentloaded")
+            # Wait until the browser/context closes OR timeout.
+            closed = asyncio.Event()
+            page.on("close", lambda _p=None: closed.set())
+            context.on("close", lambda _c=None: closed.set())
+            try:
+                await asyncio.wait_for(closed.wait(), timeout=minutes * 60)
+            except TimeoutError:
+                rprint("[yellow]![/yellow] timeout reached — saving whatever cookies exist…")
+            cookies = await context.cookies()
+            settings.binance_cookies_path.parent.mkdir(parents=True, exist_ok=True)
+            settings.binance_cookies_path.write_text(json.dumps(cookies, indent=2))
+            with contextlib.suppress(Exception):
+                settings.binance_cookies_path.chmod(0o600)
+            await browser.close()
+            rprint(f"[green]✓[/green] saved {len(cookies)} cookies → {settings.binance_cookies_path}")
+    try:
+        _run(_go())
+    except Exception as e:  # noqa: BLE001
+        rprint(f"[red]✗[/red] cookies-export failed: {e}")
+        raise typer.Exit(code=1) from e
+
+
+@app.command("selectors-tune")
+def cmd_selectors_tune(
+    url: str = typer.Option("https://www.binance.com/en/square/post-create", help="Page to probe"),
+    headless: bool = typer.Option(False, "--headless/--headed"),
+) -> None:
+    """Probe the live Binance Square DOM against `data/selectors/binance_square.yaml`.
+
+    Prints which selector candidate (if any) matches each role. Use this after
+    any UI change on Binance's side to update the YAML registry.
+    """
+    async def _go() -> None:
+        import yaml as _yaml
+        from playwright.async_api import async_playwright
+
+        from engine.distribution.browser_publisher import _parse_selector
+
+        settings = get_settings()
+        sel_path = settings.root_dir / "data" / "selectors" / "binance_square.yaml"
+        registry = _yaml.safe_load(sel_path.read_text(encoding="utf-8")) or {}
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=headless, args=["--no-sandbox"])
+            context = await browser.new_context(
+                viewport={"width": 1366, "height": 900},
+                locale="ar-SA",
+            )
+            # Load cookies if present
+            cp = settings.binance_cookies_path
+            if cp.exists():
+                with contextlib.suppress(Exception):
+                    context.add_cookies(json.loads(cp.read_text()))
+            page = await context.new_page()
+            await page.goto(url, wait_until="networkidle", timeout=45_000)
+            await page.wait_for_timeout(2000)
+
+            table = Table(title=f"Selector probe — {url}")
+            for col in ("role", "matched", "selector"):
+                table.add_column(col)
+            for role, candidates in registry.items():
+                matched_sel = "—"
+                matched = "[red]NO[/red]"
+                for sel in candidates or []:
+                    kind, val = _parse_selector(sel)
+                    try:
+                        if kind == "css":
+                            el = await page.query_selector(val)
+                        elif kind == "text":
+                            el = await page.get_by_text(val, exact=False).first.element_handle()
+                        elif kind == "role":
+                            name = None
+                            rname = val
+                            if "|" in val:
+                                rname, _, name = val.partition("|")
+                            el = await page.get_by_role(rname, name=name).first.element_handle()
+                        elif kind == "xpath":
+                            el = await page.query_selector(f"xpath={val}")
+                        else:
+                            el = None
+                    except Exception:  # noqa: BLE001
+                        el = None
+                    if el:
+                        matched = "[green]YES[/green]"
+                        matched_sel = sel
+                        break
+                table.add_row(role, matched, matched_sel)
+            rprint(table)
+            await browser.close()
+    _run(_go())
+
+
+@app.command("publish-test")
+def cmd_publish_test(
+    body: str = typer.Option("$BTC اختبار النشر التلقائي 🤑 $BTC", help="Body text"),
+    image: list[Path] = typer.Option(None, "--image", help="Image path (repeatable)"),
+    headed: bool = typer.Option(False, "--headed"),
+) -> None:
+    """One-shot browser publish — useful for validating selectors with a real account."""
+    async def _go() -> None:
+        from engine.distribution.browser_publisher import BrowserPublisher, BrowserPublishOptions
+        bp = BrowserPublisher(BrowserPublishOptions(headless=not headed))
+        r = await bp.publish(body_text=body, image_paths=list(image or []))
+        rprint({"ok": r.success, "id": r.external_id, "err": r.error, "raw": r.raw_response})
+    _run(_go())
+
+
+@app.command("snapshot")
+def cmd_snapshot() -> None:
+    """Compress the SQLite DB into data/runtime/snapshots/YYYYMMDD-HHMMSS.db.gz."""
+    import gzip
+    import shutil
+    from datetime import datetime
+    settings = get_settings()
+    url = settings.database_url
+    if not url.startswith("sqlite"):
+        rprint("[yellow]![/yellow] snapshot only supports sqlite for now")
+        raise typer.Exit(code=1)
+    src = Path(url.split("///")[-1])
+    if not src.exists():
+        rprint(f"[red]✗[/red] db not found at {src}")
+        raise typer.Exit(code=1)
+    dst_dir = settings.runtime_dir / "snapshots"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst = dst_dir / f"{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.db.gz"
+    with src.open("rb") as fin, gzip.open(dst, "wb") as fout:
+        shutil.copyfileobj(fin, fout)
+    rprint(f"[green]✓[/green] snapshot → {dst}")
 
 
 if __name__ == "__main__":

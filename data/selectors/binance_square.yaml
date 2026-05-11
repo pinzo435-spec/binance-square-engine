@@ -1,0 +1,80 @@
+# Binance Square selector registry.
+#
+# Each role lists candidates in priority order. The publisher tries them in
+# order until one matches. Update this file (no code edit needed) whenever
+# Binance changes the DOM. The `bse selectors-tune` command probes the live
+# DOM and reports which candidates match — use it to keep this file current.
+#
+# Convention:
+#   - css:    standard CSS selector
+#   - text:   Playwright text= selector
+#   - role:   Playwright getByRole shortcut (role/name format: "role|name")
+#   - xpath:  raw xpath (use sparingly)
+
+editor_textarea:
+  - 'css:div[contenteditable="true"][data-placeholder]'
+  - 'css:div[contenteditable="true"][role="textbox"]'
+  - 'css:textarea[placeholder*="Share" i]'
+  - 'css:textarea[placeholder*="post" i]'
+  - 'css:textarea[placeholder*="content" i]'
+  - 'css:[data-testid*="post-input"]'
+  - 'css:[data-testid*="editor"]'
+  - 'css:[class*="post-editor"] [contenteditable="true"]'
+  - 'css:[class*="square"] [contenteditable="true"]'
+  - 'css:div[contenteditable="true"]'
+
+image_upload_input:
+  - 'css:input[type="file"][accept*="image"]'
+  - 'css:[data-testid*="upload"] input[type="file"]'
+  - 'css:[class*="upload"] input[type="file"]'
+  - 'css:input[type="file"]'
+
+# Buttons that open the post-creation modal/page (when starting from /square home)
+compose_button:
+  - 'text:Post'
+  - 'text:What\'s on your mind'
+  - 'text:Share your thoughts'
+  - 'text:Compose'
+  - 'role:button|Post'
+  - 'css:[data-testid*="compose"]'
+  - 'css:[class*="compose-entry"]'
+
+publish_button:
+  - 'css:button[data-bn-type="button"]:has-text("Publish")'
+  - 'text:Publish'
+  - 'text:Post'
+  - 'text:نشر'
+  - 'css:[data-testid*="publish"]'
+  - 'css:[data-testid*="submit-post"]'
+  - 'css:button[type="submit"]'
+
+# Confirmation that a post was published (toast, modal close, redirect, etc.)
+publish_confirmation:
+  - 'text:Posted successfully'
+  - 'text:Successfully published'
+  - 'text:Successfully posted'
+  - 'text:نشر بنجاح'
+  - 'css:[data-testid*="success-toast"]'
+  - 'css:[class*="success-message"]'
+  - 'css:[class*="toast"]:has-text("success" i)'
+
+# Login wall indicators (if any of these match, cookies are stale)
+login_wall:
+  - 'css:[data-testid*="login"]'
+  - 'text:Log In'
+  - 'text:Sign In'
+  - 'text:تسجيل الدخول'
+  - 'css:form[action*="login"]'
+
+# Cashtag suggestion popup when typing $XYZ
+cashtag_suggestion:
+  - 'css:[class*="cashtag-suggest"] [class*="item"]:first-child'
+  - 'css:[class*="ticker-suggest"] li:first-child'
+  - 'css:[role="listbox"] [role="option"]:first-child'
+
+# Trading pair tag attachment area
+trading_pair_input:
+  - 'css:[data-testid*="trading-pair"] input'
+  - 'css:[class*="trading-pair"] input'
+  - 'css:[placeholder*="ticker" i]'
+  - 'css:[placeholder*="trading pair" i]'

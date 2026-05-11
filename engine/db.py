@@ -48,8 +48,8 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 @asynccontextmanager
 async def session_scope() -> AsyncIterator[AsyncSession]:
     """Provides a transactional session. Commits on exit, rolls back on error."""
-    Session = get_session_factory()
-    async with Session() as s:
+    session_factory = get_session_factory()
+    async with session_factory() as s:
         try:
             yield s
             await s.commit()

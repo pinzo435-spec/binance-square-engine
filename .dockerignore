@@ -1,0 +1,38 @@
+# Local dev artifacts that should NOT bake into the image
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Data + logs are mounted as volumes at runtime
+data/runtime/
+data/reference/*.json
+docs/
+logs/
+
+# Git + IDE
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+
+# Tests
+tests/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Build outputs
+*.egg-info/
+dist/
+build/

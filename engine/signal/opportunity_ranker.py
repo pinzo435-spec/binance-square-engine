@@ -20,7 +20,7 @@ Priority score (see strategy doc §9.2):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -31,7 +31,7 @@ from engine.models import Opportunity, Post
 from engine.signal.market_scanner import MarketScanner, MarketSignal
 from engine.signal.news_feed import NewsFeed, NewsItem
 from engine.signal.reference_feed import ReferenceFeed, ReferencePostRecord
-from engine.signal.trend_scraper import TrendScraper, TrendingTag
+from engine.signal.trend_scraper import TrendingTag, TrendScraper
 
 log = get_logger(__name__)
 
@@ -99,7 +99,7 @@ class OpportunityRanker:
         return movers, tags, news, ref
 
     async def _recently_posted_tickers(self, hours: int) -> set[str]:
-        cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=hours)
+        cutoff = datetime.now(tz=UTC) - timedelta(hours=hours)
         async with session_scope() as s:
             res = await s.execute(
                 select(Post.ticker).where(Post.published_at >= cutoff)
@@ -111,7 +111,7 @@ class OpportunityRanker:
         recent_tickers = await self._recently_posted_tickers(self.settings.min_gap_same_ticker_hours)
         ref_recent_tickers = {
             t for r in ref for t in r.tickers
-            if r.published_at and r.published_at >= datetime.now(tz=timezone.utc) - timedelta(hours=1)
+            if r.published_at and r.published_at >= datetime.now(tz=UTC) - timedelta(hours=1)
         }
         news_tickers = {t for n in news for t in n.detected_tickers}
 
@@ -168,7 +168,7 @@ class OpportunityRanker:
         """Write the top opportunities to the DB (deduped against recent open ones)."""
         if not opps:
             return 0
-        cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=2)
+        cutoff = datetime.now(tz=UTC) - timedelta(hours=2)
         written = 0
         async with session_scope() as s:
             existing = await s.execute(

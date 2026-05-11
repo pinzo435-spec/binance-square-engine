@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import desc, select
@@ -27,7 +27,7 @@ CASHTAG = re.compile(r"\$([A-Z][A-Z0-9]{1,15})")
 
 
 async def collect_top_posts(days: int = 14, top_n: int = 20) -> list[Post]:
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(tz=UTC) - timedelta(days=days)
     async with session_scope() as s:
         posts = (await s.execute(
             select(Post).where(

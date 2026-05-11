@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from engine.signal.opportunity_ranker import RankedOpportunity
 
-
 _BULL_TRIGGERS = {"PUMP", "EXTREME_PUMP", "VOLATILITY_UP", "BINANCE_LIST", "PARTNERSHIP", "ATH"}
 _BEAR_TRIGGERS = {"DUMP", "EXTREME_DUMP", "VOLATILITY_DOWN", "HACK", "BINANCE_DELIST", "REGULATORY"}
 

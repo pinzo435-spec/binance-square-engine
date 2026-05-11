@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -34,7 +34,7 @@ async def _startup() -> None:
 async def health() -> dict:
     return {
         "status": "ok",
-        "ts": datetime.now(tz=timezone.utc).isoformat(),
+        "ts": datetime.now(tz=UTC).isoformat(),
         "publish_mode": settings.publish_mode,
         "max_per_day": settings.max_posts_per_day,
     }
@@ -113,7 +113,7 @@ async def api_pause(hours: float = 1.0, reason: str = "manual") -> dict:
         raise HTTPException(400, "hours must be 0 < h <= 168")
     async with session_scope() as s:
         s.add(PublishLock(
-            paused_until=datetime.now(tz=timezone.utc) + timedelta(hours=hours),
+            paused_until=datetime.now(tz=UTC) + timedelta(hours=hours),
             reason=reason,
         ))
     return {"paused_for_hours": hours, "reason": reason}
