@@ -1,0 +1,41 @@
+# Systemd unit for the long-running daemon.
+# Install:
+#   sudo cp deploy/systemd/binance-square-engine.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now binance-square-engine
+#
+# Logs:
+#   journalctl -u binance-square-engine -f
+
+[Unit]
+Description=binance-square-engine — AI growth daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bse
+Group=bse
+WorkingDirectory=/opt/binance-square-engine
+EnvironmentFile=/opt/binance-square-engine/.env
+ExecStart=/opt/binance-square-engine/.venv/bin/python /opt/binance-square-engine/auto_publish.py
+Restart=on-failure
+RestartSec=10s
+# Don't restart on clean Ctrl-C
+SuccessExitStatus=0 130
+
+# Hardening (relaxed because Playwright needs broad access)
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+
+# File handles for many concurrent images
+LimitNOFILE=65536
+
+# Memory cap (Chromium can leak)
+MemoryHigh=1500M
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

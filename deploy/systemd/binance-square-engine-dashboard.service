@@ -1,0 +1,25 @@
+# Companion unit running the FastAPI dashboard on :8000.
+
+[Unit]
+Description=binance-square-engine — dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bse
+Group=bse
+WorkingDirectory=/opt/binance-square-engine
+EnvironmentFile=/opt/binance-square-engine/.env
+ExecStart=/opt/binance-square-engine/.venv/bin/python -m engine.dashboard
+Restart=on-failure
+RestartSec=10s
+
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

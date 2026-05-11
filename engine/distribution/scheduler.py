@@ -13,11 +13,11 @@ Design:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import random
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 import yaml
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -57,6 +57,61 @@ def _hash_jitter(base: datetime, jitter_minutes: int) -> datetime:
     return base + timedelta(minutes=delta)
 
 
+def _cmp_threshold(value: float | None, expr: str) -> bool:
+    """Parse exprs like '>= 15', '<= -10', '> 4', '< 0', '== 1', '!= 0'."""
+    if value is None:
+        return False
+    expr = expr.strip()
+    for op in (">=", "<=", "==", "!=", ">", "<"):
+        if expr.startswith(op):
+            try:
+                rhs = float(expr[len(op):].strip())
+            except ValueError:
+                return False
+            return {
+                ">=": value >= rhs,
+                "<=": value <= rhs,
+                ">":  value > rhs,
+                "<":  value < rhs,
+                "==": value == rhs,
+                "!=": value != rhs,
+            }[op]
+    # Bare number = equality
+    try:
+        return value == float(expr)
+    except ValueError:
+        return False
+
+
+def _match_burst_rule(opp: Opportunity, rules: list[dict]) -> dict | None:
+    """Return the first rule that matches, or None."""
+    for rule in rules:
+        cond = rule.get("when") or {}
+        ok = True
+        if "change_1h_pct" in cond and not _cmp_threshold(opp.change_1h_pct, str(cond["change_1h_pct"])):
+            ok = False
+        if ok and "change_24h_pct" in cond and not _cmp_threshold(opp.change_24h_pct, str(cond["change_24h_pct"])):
+            ok = False
+        if ok and "volume_ratio" in cond and not _cmp_threshold(opp.volume_ratio, str(cond["volume_ratio"])):
+            ok = False
+        if (
+            ok and "binance_trend_match" in cond and bool(cond["binance_trend_match"])
+            and not opp.binance_trend_hashtag
+        ):
+            ok = False
+        if ok and "priority_score" in cond and not _cmp_threshold(opp.priority_score, str(cond["priority_score"])):
+            ok = False
+        if ok and "news_trigger_in" in cond:
+            triggers = set(cond["news_trigger_in"] or [])
+            payload = opp.raw_payload or {}
+            news_triggers = set(payload.get("news_triggers") or [])
+            if not (triggers & news_triggers):
+                ok = False
+        if ok:
+            return rule
+    return None
+
+
 class EngineScheduler:
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -76,8 +131,8 @@ class EngineScheduler:
             log.exception("refresh_signals_failed", error=str(e))
 
     async def maintenance(self) -> None:
-        """Prune very old un-consumed opportunities."""
-        cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=12)
+        """Prune very old un-consumed opportunities + roll snapshot."""
+        cutoff = datetime.now(tz=UTC) - timedelta(hours=12)
         async with session_scope() as s:
             stale = (await s.execute(
                 select(Opportunity).where(
@@ -87,14 +142,104 @@ class EngineScheduler:
             )).scalars().all()
             for o in stale:
                 o.consumed = True
-                o.consumed_at = datetime.now(tz=timezone.utc)
+                o.consumed_at = datetime.now(tz=UTC)
         if stale:
             log.info("stale_opportunities_pruned", count=len(stale))
+
+    async def daily_snapshot(self) -> None:
+        """Compress the SQLite db to data/runtime/snapshots/YYYYMMDD.db.gz."""
+        import gzip
+        import shutil
+        try:
+            url = self.settings.database_url
+            if not url.startswith("sqlite"):
+                return
+            src = Path(url.split("///")[-1])
+            if not src.exists():
+                return
+            dst_dir = self.settings.runtime_dir / "snapshots"
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            tag = datetime.now(tz=UTC).strftime("%Y%m%d")
+            dst = dst_dir / f"{tag}.db.gz"
+            with src.open("rb") as fin, gzip.open(dst, "wb") as fout:
+                shutil.copyfileobj(fin, fout)
+            # Retention: keep last 14 days
+            snaps = sorted(dst_dir.glob("*.db.gz"))
+            for old in snaps[:-14]:
+                with contextlib.suppress(Exception):
+                    old.unlink()
+            log.info("db_snapshot_written", path=str(dst), kept=min(len(snaps), 14))
+        except Exception as e:  # noqa: BLE001
+            log.exception("daily_snapshot_failed", error=str(e))
+
+    async def evaluate_burst_triggers(self) -> None:
+        """Check the top of the opportunity queue against playbooks/burst_triggers.yaml.
+
+        On a match, fire one or more posts back-to-back with the configured
+        gap (respecting rate_limiter as a safety net).
+        """
+        try:
+            cfg = yaml.safe_load(self.settings.burst_triggers_file.read_text(encoding="utf-8")) or {}
+        except Exception as e:  # noqa: BLE001
+            log.warning("burst_triggers_load_failed", error=str(e))
+            return
+        rules = cfg.get("triggers") or []
+        if not rules:
+            return
+
+        async with session_scope() as s:
+            rows = (await s.execute(
+                select(Opportunity)
+                .where(Opportunity.consumed.is_(False))
+                .order_by(desc(Opportunity.priority_score), desc(Opportunity.discovered_at))
+                .limit(20)
+            )).scalars().all()
+
+        for opp in rows:
+            matched = _match_burst_rule(opp, rules)
+            if not matched:
+                continue
+            log.info("burst_match", rule=matched["name"], ticker=opp.ticker,
+                     score=opp.priority_score)
+            await self._fire_burst(opp, matched)
+            # one burst per evaluation cycle keeps it conservative
+            return
+
+    async def _fire_burst(self, opp: Opportunity, rule: dict) -> None:
+        burst = rule.get("burst") or {}
+        post_count = int(burst.get("post_count", 1))
+        gap = int(burst.get("gap_seconds", 90))
+        templates = burst.get("templates") or ["trade_card"]
+
+        for i in range(post_count):
+            ranked = RankedOpportunity(
+                ticker=opp.ticker,
+                trigger=opp.trigger,
+                change_1h_pct=opp.change_1h_pct,
+                change_24h_pct=opp.change_24h_pct or 0.0,
+                volume_ratio=opp.volume_ratio,
+                binance_trend_hashtag=opp.binance_trend_hashtag,
+                priority_score=opp.priority_score,
+                suggested_template=templates[i % len(templates)],
+                suggested_tendency=opp.suggested_tendency,
+                raw_payload=dict(opp.raw_payload or {}),
+            )
+            post = await self.assembler.assemble(ranked)
+            visuals = await self.visuals.produce(ranked)
+            post.image_paths = visuals.paths
+            await self.publisher.publish(post, opportunity_id=opp.id)
+            if i + 1 < post_count:
+                await asyncio.sleep(max(gap, 30))
+        async with session_scope() as s:
+            row = await s.get(Opportunity, opp.id)
+            if row is not None:
+                row.consumed = True
+                row.consumed_at = datetime.now(tz=UTC)
 
     # ---------- slot execution ----------
 
     async def run_slot(self, group: str) -> None:
-        log.info("slot_fired", group=group, ts=datetime.now(tz=timezone.utc).isoformat())
+        log.info("slot_fired", group=group, ts=datetime.now(tz=UTC).isoformat())
         try:
             await self._do_slot(group)
         except Exception as e:
@@ -177,6 +322,18 @@ class EngineScheduler:
             self.maintenance,
             IntervalTrigger(hours=1),
             id="bg_maintenance",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self.evaluate_burst_triggers,
+            IntervalTrigger(minutes=7),
+            id="bg_burst_triggers",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self.daily_snapshot,
+            CronTrigger(hour=0, minute=10),
+            id="bg_daily_snapshot",
             replace_existing=True,
         )
 

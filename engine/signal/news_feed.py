@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -49,7 +49,7 @@ class NewsFeed:
         self._client = client
         self._owns_client = client is None
 
-    async def __aenter__(self) -> "NewsFeed":
+    async def __aenter__(self) -> NewsFeed:
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=15.0, follow_redirects=True)
             self._owns_client = True
@@ -70,7 +70,7 @@ class NewsFeed:
                 items.extend(self._parse(r.text, source=url))
             except Exception as e:
                 log.warning("news_feed_failed", url=url, error=str(e))
-        items.sort(key=lambda x: x.published_at or datetime.fromtimestamp(0, tz=timezone.utc),
+        items.sort(key=lambda x: x.published_at or datetime.fromtimestamp(0, tz=UTC),
                    reverse=True)
         log.info("news_fetched", count=len(items))
         return items[:50]

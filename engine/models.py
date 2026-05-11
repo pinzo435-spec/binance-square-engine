@@ -49,7 +49,7 @@ class Opportunity(Base):
     consumed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    posts: Mapped[list["Post"]] = relationship(back_populates="opportunity")
+    posts: Mapped[list[Post]] = relationship(back_populates="opportunity")
 
 
 class Post(Base):
@@ -73,8 +73,8 @@ class Post(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    opportunity: Mapped["Opportunity"] = relationship(back_populates="posts")
-    snapshots: Mapped[list["EngagementSnapshot"]] = relationship(back_populates="post")
+    opportunity: Mapped[Opportunity] = relationship(back_populates="posts")
+    snapshots: Mapped[list[EngagementSnapshot]] = relationship(back_populates="post")
 
     __table_args__ = (Index("ix_posts_ticker_published_at", "ticker", "published_at"),)
 
@@ -93,7 +93,7 @@ class EngagementSnapshot(Base):
     quote_count: Mapped[int] = mapped_column(Integer, default=0)
     engagement_score: Mapped[float] = mapped_column(Float, default=0.0)
 
-    post: Mapped["Post"] = relationship(back_populates="snapshots")
+    post: Mapped[Post] = relationship(back_populates="snapshots")
 
 
 class Template(Base):

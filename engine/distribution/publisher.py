@@ -9,7 +9,7 @@ Modes:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -132,7 +132,7 @@ class Publisher:
                 status=status,
                 error=error,
                 external_post_id=external_id,
-                published_at=datetime.now(tz=timezone.utc) if status.startswith("published") else None,
+                published_at=datetime.now(tz=UTC) if status.startswith("published") else None,
             )
             s.add(row)
             # Mark opportunity consumed if we published or blocked permanently
@@ -142,4 +142,4 @@ class Publisher:
                 )).scalars().first()
                 if opp and status in ("published", "published_dry_run", "blocked"):
                     opp.consumed = True
-                    opp.consumed_at = datetime.now(tz=timezone.utc)
+                    opp.consumed_at = datetime.now(tz=UTC)

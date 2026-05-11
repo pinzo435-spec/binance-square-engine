@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import desc, select
 
@@ -35,8 +35,8 @@ def _match_post(scraped: ReferencePostRecord, posts: list[Post]) -> Post | None:
     candidates = [p for p in posts if p.body_text.strip() == scraped.body_text.strip()]
     if not candidates:
         return None
-    candidates.sort(key=lambda p: abs(((p.published_at or datetime.min.replace(tzinfo=timezone.utc))
-                                        - (scraped.published_at or datetime.min.replace(tzinfo=timezone.utc))).total_seconds()))
+    candidates.sort(key=lambda p: abs(((p.published_at or datetime.min.replace(tzinfo=UTC))
+                                        - (scraped.published_at or datetime.min.replace(tzinfo=UTC))).total_seconds()))
     best = candidates[0]
     if best.published_at and scraped.published_at:
         delta = abs((best.published_at - scraped.published_at).total_seconds())
@@ -58,7 +58,7 @@ class PostTracker:
         if not scraped:
             return 0
 
-        cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=lookback_hours)
+        cutoff = datetime.now(tz=UTC) - timedelta(hours=lookback_hours)
         async with session_scope() as s:
             our_posts = (await s.execute(
                 select(Post).where(
@@ -72,7 +72,7 @@ class PostTracker:
                 p = _match_post(sc, our_posts)
                 if not p:
                     continue
-                age_hours = ((datetime.now(tz=timezone.utc) - (p.published_at or datetime.now(tz=timezone.utc)))
+                age_hours = ((datetime.now(tz=UTC) - (p.published_at or datetime.now(tz=UTC)))
                              .total_seconds() / 3600.0)
                 # If the most recent snapshot is < 30 min old, skip
                 last_snap = (await s.execute(
@@ -81,7 +81,7 @@ class PostTracker:
                     .order_by(desc(EngagementSnapshot.captured_at))
                     .limit(1)
                 )).scalars().first()
-                if last_snap and (datetime.now(tz=timezone.utc) - last_snap.captured_at).total_seconds() < 30 * 60:
+                if last_snap and (datetime.now(tz=UTC) - last_snap.captured_at).total_seconds() < 30 * 60:
                     continue
                 snap = EngagementSnapshot(
                     post_id=p.id,

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, select
 
 from engine.db import session_scope
 from engine.logging_setup import get_logger
@@ -73,7 +73,7 @@ def _group(rows: list[tuple[Post, EngagementSnapshot]], key_fn) -> list[Performa
 
 
 async def build_report(period_hours: int = 24) -> PerformanceReport:
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=period_hours)
+    cutoff = datetime.now(tz=UTC) - timedelta(hours=period_hours)
     rows = await _latest_snapshot_per_post(cutoff)
     n = len(rows) or 1
     return PerformanceReport(

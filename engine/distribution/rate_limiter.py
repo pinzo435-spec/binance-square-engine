@@ -11,7 +11,7 @@ Rails (from strategy doc §11.5):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import desc, func, select
 
@@ -35,10 +35,10 @@ class RateLimiter:
 
     async def check(self, ticker: str) -> RateDecision:
         s = self.settings
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
 
         def _aware(dt):
-            return dt.replace(tzinfo=timezone.utc) if dt is not None and dt.tzinfo is None else dt
+            return dt.replace(tzinfo=UTC) if dt is not None and dt.tzinfo is None else dt
 
         async with session_scope() as sess:
             # 0. Global pause?
@@ -116,7 +116,7 @@ class RateLimiter:
     async def trip_pause(self, hours: float, reason: str) -> None:
         async with session_scope() as sess:
             sess.add(PublishLock(
-                paused_until=datetime.now(tz=timezone.utc) + timedelta(hours=hours),
+                paused_until=datetime.now(tz=UTC) + timedelta(hours=hours),
                 reason=reason,
             ))
         log.warning("publishing_paused", hours=hours, reason=reason)
