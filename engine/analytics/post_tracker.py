@@ -98,4 +98,15 @@ class PostTracker:
                     p.external_post_id = sc.id
                 recorded += 1
         log.info("snapshots_recorded", count=recorded)
+
+        # Rebuild growth scores for any post that got fresh engagement.
+        if recorded:
+            try:
+                from engine.growth import growth_scorer
+                for sc in scraped:
+                    p = _match_post(sc, our_posts)
+                    if p is not None:
+                        await growth_scorer.upsert_for_post(p.id)
+            except Exception as e:  # noqa: BLE001
+                log.warning("growth_score_refresh_failed", error=str(e))
         return recorded

@@ -140,3 +140,131 @@ class PublishLock(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Growth Intelligence Layer (Phase D)
+# ─────────────────────────────────────────────────────────────────────────────
+# Rolling aggregates the self-optimizer reads/writes every cycle. Each row is
+# the *current state* of a (key, dimension) pair, not a time-series — the
+# `samples` counter tracks how many data points went in so we can EWMA properly.
+
+
+class HookPerformance(Base):
+    """Per-hook-category rolling performance (EWMA over engagement)."""
+
+    __tablename__ = "hook_performance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    category: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    # categories: curiosity / greed / fear / contrarian / humor / self_deprecation / neutral
+    samples: Mapped[int] = mapped_column(Integer, default=0)
+    avg_views: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_likes: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_engagement: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_growth_score: Mapped[float] = mapped_column(Float, default=0.0)
+    weight: Mapped[float] = mapped_column(Float, default=1.0)  # selector bias 0.1..2.0
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ImagePerformance(Base):
+    """Per-template rolling performance (template_name → engagement)."""
+
+    __tablename__ = "image_performance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    template_name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    samples: Mapped[int] = mapped_column(Integer, default=0)
+    avg_views: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_likes: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_engagement: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_growth_score: Mapped[float] = mapped_column(Float, default=0.0)
+    weight: Mapped[float] = mapped_column(Float, default=1.0)
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CoinPerformance(Base):
+    """Per-ticker historical engagement; used by coin_priority_engine."""
+
+    __tablename__ = "coin_performance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    samples: Mapped[int] = mapped_column(Integer, default=0)
+    avg_views: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_engagement: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_growth_score: Mapped[float] = mapped_column(Float, default=0.0)
+    historical_weight: Mapped[float] = mapped_column(Float, default=1.0)
+    last_posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class PostingWindowPerformance(Base):
+    """Per-hour-of-day (UTC) performance window."""
+
+    __tablename__ = "posting_window_performance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    hour_utc: Mapped[int] = mapped_column(Integer, unique=True, index=True)  # 0..23
+    samples: Mapped[int] = mapped_column(Integer, default=0)
+    avg_views: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_engagement: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_growth_score: Mapped[float] = mapped_column(Float, default=0.0)
+    weight: Mapped[float] = mapped_column(Float, default=1.0)  # used by adaptive scheduler
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class EngagementVelocity(Base):
+    """Velocity metric per post: views/likes per hour during first N hours.
+
+    Captured once when the post reaches `age_hours == 1.0`, then again at
+    age 6h and 24h, by the analytics layer.
+    """
+
+    __tablename__ = "engagement_velocity"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("posts.id"), index=True)
+    age_hours: Mapped[float] = mapped_column(Float, index=True)  # 1.0, 6.0, 24.0
+    views_per_hour: Mapped[float] = mapped_column(Float, default=0.0)
+    likes_per_hour: Mapped[float] = mapped_column(Float, default=0.0)
+    engagement_per_hour: Mapped[float] = mapped_column(Float, default=0.0)
+    captured_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (Index("ix_velocity_post_age", "post_id", "age_hours"),)
+
+
+class GrowthScoreSnapshot(Base):
+    """Composite growth score per post; updated whenever new engagement arrives.
+
+    growth_score = log1p(views) * 0.20
+                 + log1p(likes) * 1.00
+                 + log1p(comments) * 1.30
+                 + log1p(reposts) * 1.60
+                 + velocity_bonus * 0.40
+    The exact weights live in `growth_scorer.py` so they can be tuned without
+    a migration.
+    """
+
+    __tablename__ = "growth_scores"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("posts.id"), unique=True, index=True)
+    growth_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    velocity_bonus: Mapped[float] = mapped_column(Float, default=0.0)
+    age_hours: Mapped[float] = mapped_column(Float, default=0.0)
+    last_view_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_like_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_comment_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_share_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )

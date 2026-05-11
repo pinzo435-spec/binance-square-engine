@@ -1,6 +1,6 @@
 import os
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -13,6 +13,7 @@ os.environ["LLM_PROVIDER"] = "mock"
 # Reset cached settings/engine
 import engine.config as cfg
 import engine.db as db
+
 cfg._settings = None
 db._engine = None
 db._session_factory = None
@@ -47,7 +48,7 @@ async def test_clean_state_allows():
 async def test_pause_lock_blocks():
     async with session_scope() as s:
         s.add(PublishLock(
-            paused_until=datetime.now(tz=timezone.utc) + timedelta(hours=1),
+            paused_until=datetime.now(tz=UTC) + timedelta(hours=1),
             reason="test",
         ))
     decision = await RateLimiter().check("BTC")
@@ -62,7 +63,7 @@ async def test_same_ticker_gap_blocks():
             ticker="BTC", body_text="$BTC test $BTC", tendency=0,
             trading_pairs=["BTCUSDT"], image_paths=[], image_urls=[],
             template_name="t", publish_mode="api",
-            published_at=datetime.now(tz=timezone.utc) - timedelta(hours=1),
+            published_at=datetime.now(tz=UTC) - timedelta(hours=1),
             status="published",
         ))
     decision = await RateLimiter().check("BTC")

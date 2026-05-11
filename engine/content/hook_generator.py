@@ -211,6 +211,20 @@ def _build_user_prompt(req: HookRequest, examples: list[dict[str, Any]]) -> str:
     parts.append(f"- tendency: {req.tendency}")
     if req.context:
         parts.append(f"- context: {req.context}")
+
+    # Growth Intelligence hint: bias toward the highest-performing hook category.
+    try:
+        from engine.growth.hook_intelligence import load_weights, softmax_pick
+        weights = load_weights()
+        if weights:
+            chosen_cat = softmax_pick(weights, temperature=0.9)
+            parts.append(
+                f"- preferred_emotional_tone: {chosen_cat} "
+                f"(growth-intel adaptive weighting)"
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
     parts.append("\nأعد فقط نص المنشور الواحد، بدون شرح أو علامات إضافية.")
     return "\n".join(parts)
 

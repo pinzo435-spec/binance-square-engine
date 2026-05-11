@@ -65,6 +65,12 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP", "N", "SIM", "C4"]
 ignore = ["E501", "B008"]
 
+[tool.ruff.lint.per-file-ignores]
+# Test bootstrap sets env vars BEFORE importing engine modules, hence E402.
+# The NamedTemporaryFile lives as a module-level handle so the path is stable
+# across the entire test run; SIM115 doesn't apply.
+"tests/*.py" = ["E402", "SIM115", "C408"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

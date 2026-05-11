@@ -146,6 +146,19 @@ class EngineScheduler:
         if stale:
             log.info("stale_opportunities_pruned", count=len(stale))
 
+    async def run_self_optimizer(self) -> None:
+        """Trigger the 24h growth-intelligence loop."""
+        try:
+            from engine.growth import self_optimizer
+            report = await self_optimizer.run_cycle()
+            log.info(
+                "self_optimizer_done",
+                steps_ok=sum(1 for st in report.steps if st["ok"]),
+                steps_total=len(report.steps),
+            )
+        except Exception as e:  # noqa: BLE001
+            log.exception("self_optimizer_failed", error=str(e))
+
     async def daily_snapshot(self) -> None:
         """Compress the SQLite db to data/runtime/snapshots/YYYYMMDD.db.gz."""
         import gzip
@@ -283,6 +296,19 @@ class EngineScheduler:
         opp_id, ranked = picked
         log.info("opportunity_picked", id=opp_id, ticker=ranked.ticker, score=ranked.priority_score)
 
+        # Growth Intelligence: bias the template choice by historical performance.
+        try:
+            from engine.growth.image_strategy_engine import pick_template
+            choice = pick_template(tendency=ranked.suggested_tendency)
+            if choice.reason == "adaptive" and choice.name != ranked.suggested_template:
+                log.info(
+                    "template_overridden_by_growth",
+                    from_=ranked.suggested_template, to=choice.name, weight=round(choice.weight, 3),
+                )
+                ranked.suggested_template = choice.name
+        except Exception:  # noqa: BLE001
+            pass
+
         post = await self.assembler.assemble(ranked)
         visuals = await self.visuals.produce(ranked)
         post.image_paths = visuals.paths
@@ -334,6 +360,12 @@ class EngineScheduler:
             self.daily_snapshot,
             CronTrigger(hour=0, minute=10),
             id="bg_daily_snapshot",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self.run_self_optimizer,
+            CronTrigger(hour=2, minute=0),  # 02:00 UTC daily
+            id="bg_self_optimizer",
             replace_existing=True,
         )
 

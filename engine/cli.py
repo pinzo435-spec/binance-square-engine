@@ -445,5 +445,43 @@ def cmd_snapshot() -> None:
     rprint(f"[green]✓[/green] snapshot → {dst}")
 
 
+@app.command("optimise")
+def cmd_optimise() -> None:
+    """Run the 24h growth-intelligence optimisation cycle on demand."""
+    from engine.growth.self_optimizer import run_cycle
+
+    async def _go() -> None:
+        report = await run_cycle()
+        rprint({"started_at": report.started_at, "finished_at": report.finished_at})
+        for st in report.steps:
+            badge = "[green]ok[/green]" if st["ok"] else "[red]fail[/red]"
+            rprint(f"  - {st['name']}: {badge} {st.get('info') or st.get('error') or ''}")
+
+    _run(_go())
+
+
+@app.command("growth-report")
+def cmd_growth_report() -> None:
+    """Print today's growth snapshot, top hooks, top coins, posting windows."""
+    import json
+
+    from engine.growth import (
+        adaptive_scheduler,
+        hook_intelligence,
+        image_strategy_engine,
+        reference_mimicry,
+    )
+
+    rprint("[bold]Hook weights[/bold]:")
+    rprint(json.dumps(hook_intelligence.load_weights(), ensure_ascii=False, indent=2))
+    rprint("\n[bold]Image template weights[/bold]:")
+    rprint(json.dumps(image_strategy_engine.load_weights(), ensure_ascii=False, indent=2))
+    rprint("\n[bold]Posting window weights (hour_utc → weight)[/bold]:")
+    rprint(json.dumps(adaptive_scheduler.load_weights(), indent=2))
+    rprint("\n[bold]Reference patterns[/bold]:")
+    pats = reference_mimicry.load_patterns() or {"_": "no data yet"}
+    rprint(json.dumps(pats, ensure_ascii=False, indent=2))
+
+
 if __name__ == "__main__":
     app()
