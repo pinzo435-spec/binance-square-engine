@@ -13,9 +13,8 @@ dependencies = [
     "tenacity>=8.5.0",
     # Browser automation (image upload, fallback publisher)
     "playwright>=1.45.0",
-    # LLM
-    "google-generativeai>=0.7.0",
     # Scheduler
+    # (LLM access is via the public Gemini REST API; no SDK required)
     "apscheduler>=3.10.4",
     # Database
     "sqlalchemy>=2.0.30",

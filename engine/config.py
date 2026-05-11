@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # ---- LLM ----
     llm_provider: Literal["gemini", "openai", "mock"] = "gemini"
-    llm_model: str = "gemini-1.5-flash"
+    llm_model: str = "gemini-2.5-flash"
     gemini_api_key: str = ""
     openai_api_key: str = ""
 
