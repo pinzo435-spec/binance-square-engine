@@ -1,0 +1,82 @@
+<!doctype html>
+<html dir="ltr" lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 1440px; height: 3088px;
+    background: #0b0e11; color: #eaecef;
+    font-family: 'Inter','SF Pro Display','Segoe UI', Arial, sans-serif;
+  }
+  .wrap { padding: 110px 100px; height: 100%; display: flex; flex-direction: column; }
+  .top { display:flex; justify-content:space-between; align-items:center;
+         color:#848e9c; font-size:44px; }
+  .brand { color:#F0B90B; font-weight:800; letter-spacing:1px; }
+  .pair-row { margin-top:60px; display:flex; align-items:baseline; gap:32px; }
+  .symbol { font-size:140px; font-weight:800; }
+  .quote { color:#848e9c; font-size:64px; font-weight:600; }
+  .price { margin-top:30px; font-size:200px; font-weight:800; letter-spacing:-3px; }
+  .change { margin-top:18px; font-size:90px; font-weight:700; }
+  .pos { color:#0ECB81; } .neg { color:#F6465D; }
+
+  .chart {
+    margin-top:120px;
+    background:rgba(30,35,41,0.55);
+    border:1px solid rgba(132,142,156,0.18);
+    border-radius:32px;
+    padding:50px;
+    height:1700px;
+    position:relative;
+  }
+  .chart svg { width:100%; height:100%; display:block; }
+  .legend { position:absolute; top:60px; left:60px;
+            color:#848e9c; font-size:42px; }
+  .legend .price-now { color:#eaecef; font-weight:700; font-size:60px; }
+
+  .stats { margin-top:80px; display:grid; grid-template-columns:repeat(3,1fr); gap:40px; }
+  .stat { background:rgba(30,35,41,0.7); border:1px solid rgba(132,142,156,0.18);
+          border-radius:24px; padding:40px; }
+  .stat .k { color:#848e9c; font-size:40px; }
+  .stat .v { font-size:64px; font-weight:700; margin-top:8px; }
+
+  .footer { margin-top:auto; display:flex; justify-content:space-between; align-items:flex-end;
+            color:#5a6470; font-size:36px; padding-top:40px; }
+  .handle { color:#F0B90B; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">BINANCE • Spot</div>
+    <div>{{INTERVAL}}</div>
+  </div>
+  <div class="pair-row">
+    <div class="symbol">{{SYMBOL}}</div>
+    <div class="quote">/{{QUOTE}}</div>
+  </div>
+  <div class="price {{COLOR_CLASS}}">${{PRICE}}</div>
+  <div class="change {{COLOR_CLASS}}">{{CHANGE_SIGN}}{{CHANGE_PCT}}% (24h)</div>
+
+  <div class="chart">
+    <div class="legend">
+      <div>{{SYMBOL}}/USDT</div>
+      <div class="price-now">${{PRICE}}</div>
+    </div>
+    {{CHART_SVG}}
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">24h High</div><div class="v">${{HIGH_24H}}</div></div>
+    <div class="stat"><div class="k">24h Low</div><div class="v">${{LOW_24H}}</div></div>
+    <div class="stat"><div class="k">24h Volume</div><div class="v">{{VOL_24H}}</div></div>
+  </div>
+
+  <div class="footer">
+    <div class="handle">@{{HANDLE}}</div>
+    <div>{{TIMESTAMP}}</div>
+  </div>
+</div>
+</body>
+</html>

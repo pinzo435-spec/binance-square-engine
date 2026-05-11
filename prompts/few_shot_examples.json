@@ -1,0 +1,82 @@
+[
+  {
+    "trigger": "EXTREME_PUMP",
+    "template_hint": "explosion_celebration",
+    "ticker": "BILL",
+    "tendency": 1,
+    "context": "+128% خلال ساعة",
+    "output": "$BILL غلطه الشاطر بعشره 😄😄 $BILL"
+  },
+  {
+    "trigger": "PUMP",
+    "template_hint": "profit_card",
+    "ticker": "BIFI",
+    "tendency": 1,
+    "context": "+940% من 20$ → 7500$",
+    "output": "وش صار هنا ياجماعه من 20 دولار الى 7500 دولار $BIFI"
+  },
+  {
+    "trigger": "DUMP",
+    "template_hint": "rug_warning",
+    "ticker": "CHIP",
+    "tendency": 2,
+    "context": "خسارة تاريخية، 10 مليار عملة",
+    "output": "$CHIP ياعم هذي عمله نهايتها اصفار منها 10مليار عمله خلي تصفيتك فوق 2$ وخوش بيع $CHIP"
+  },
+  {
+    "trigger": "EXTREME_DUMP",
+    "template_hint": "warning_bearish",
+    "ticker": "RAVE",
+    "tendency": 2,
+    "context": "سقوط تاريخي، -80% خلال يوم",
+    "output": "$RAVE سقوط العمله التاريخي حصل بالفعل 😎 $RAVE"
+  },
+  {
+    "trigger": "VOLATILITY_UP",
+    "template_hint": "curiosity_question",
+    "ticker": "SOL",
+    "tendency": 1,
+    "context": "+6.2% خلال ساعة",
+    "output": "$SOL ولعت العمله مره ثانيه 🤑 $SOL"
+  },
+  {
+    "trigger": "VOLATILITY_DOWN",
+    "template_hint": "curiosity_question",
+    "ticker": "USUAL",
+    "tendency": 2,
+    "context": "هبوط مفاجئ -8%",
+    "output": "$USUAL اووف كيف عملت مالحقناها للاسف $USUAL"
+  },
+  {
+    "trigger": "STEADY",
+    "template_hint": "big_picture",
+    "ticker": "BTC",
+    "tendency": 0,
+    "context": "تداول جانبي 67-68k",
+    "output": "$BTC الوضع مو طبيعي اليوم 😄 $BTC"
+  },
+  {
+    "trigger": "NEWS",
+    "template_hint": "news_reaction",
+    "ticker": "ETH",
+    "tendency": 1,
+    "context": "خبر إيجابي حول التحديث",
+    "output": "$ETH اخذنا ضربه نظيفه على البث 😎 $ETH"
+  },
+  {
+    "trigger": "PUMP",
+    "template_hint": "profit_card",
+    "ticker": "STO",
+    "tendency": 2,
+    "context": "تحذير من فخ بعد ضربة كبيرة",
+    "output": "$STO احذرو ان تقعو في مصيدتها انا غامرت بمبلغ كبير $STO"
+  },
+  {
+    "trigger": "EXTREME_PUMP",
+    "template_hint": "explosion_celebration",
+    "ticker": "POWER",
+    "tendency": 1,
+    "context": "ربح تاريخي، ترتيب 4 على المنصة",
+    "output": "$POWER واخيرا بعد طول انتضار انفجرت العمله $POWER"
+  }
+]
